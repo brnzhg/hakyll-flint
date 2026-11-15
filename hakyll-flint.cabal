@@ -7,12 +7,19 @@ description:
   user-declared metadata /properties/ (a generalisation of Hakyll's tags)
   that can be indexed, given their own pages and queried from any page.
 license:            BSD-3-Clause
+license-file:       LICENSE
 author:             Brian Zhang
 maintainer:         Brian Zhang
 category:           Web
+homepage:           https://github.com/brnzhg/hakyll-flint
+bug-reports:        https://github.com/brnzhg/hakyll-flint/issues
 build-type:         Simple
 tested-with:        GHC ==9.10.3
 extra-doc-files:    README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/brnzhg/hakyll-flint.git
 
 common shared
   default-language:   GHC2024
