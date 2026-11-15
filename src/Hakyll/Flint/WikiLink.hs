@@ -105,7 +105,7 @@ data LinkTarget = LinkTarget
 parseLinkTarget :: Text -> Maybe LinkTarget
 parseLinkTarget raw
     | T.null path = Nothing
-    | otherwise = Just (LinkTarget (fromFilePath (T.unpack path)) anchor)
+    | otherwise = Just $ LinkTarget (fromFilePath $ T.unpack path) anchor
   where
     (pathPart, anchorPart) = T.break (== '#') (T.strip raw)
     path = T.dropWhile (== '/') pathPart
@@ -166,11 +166,9 @@ resolveWikiLinks onMissing = walkM resolve
                 then pure . Str . T.pack <$> titleOf (targetPage target)
                 else pure inlines
         case route of
-            Just path ->
-                pure (Link attr text (T.pack (toUrl path) <> anchorSuffix target, title))
+            Just path -> pure $ Link attr text (href path, title)
             Nothing -> case onMissing of
-                RenderMissingAsText ->
-                    pure (Span ("", ["wikilink", "missing"], []) text)
+                RenderMissingAsText -> pure $ Span missingAttr text
                 FailOnMissing -> do
                     here <- getUnderlying
                     fail $
@@ -179,8 +177,10 @@ resolveWikiLinks onMissing = walkM resolve
                             <> " links to [["
                             <> T.unpack url
                             <> "]], which has no route"
-
-    anchorSuffix = maybe "" (("#" <>) . unAnchor) . targetAnchor
+      where
+        missingAttr = ("", ["wikilink", "missing"], [])
+        href path = T.pack (toUrl path) <> anchorSuffix
+        anchorSuffix = maybe "" (("#" <>) . unAnchor) $ targetAnchor target
 
     titleOf ident =
         fromMaybe (toFilePath ident) <$> getMetadataField ident "title"
@@ -212,7 +212,7 @@ wikiLinkRules :: Pattern -> Rules ()
 wikiLinkRules pages =
     match pages . version linkVersion . compile $ do
         doc <- getResourceBody >>= readPandocWith (wikiLinkReaderOptions defaultHakyllReaderOptions)
-        makeItem (OutgoingLinks (map targetPage (outgoingLinks (itemBody doc))))
+        makeItem . OutgoingLinks . map targetPage . outgoingLinks $ itemBody doc
 
 -- | What 'wikiLinkRules' stores for each page: the pages it links to. It has
 -- no route and is never written out.
@@ -276,7 +276,7 @@ graphField select (ContextKey key) listing pages =
             then noResult ("not " <> key)
             else do
                 graph <- loadLinkGraph pages
-                case select graph (setVersion Nothing (itemIdentifier item)) of
+                case select graph . setVersion Nothing $ itemIdentifier item of
                     [] -> noResult "no links"
                     idents ->
                         ListField (listingContext listing)

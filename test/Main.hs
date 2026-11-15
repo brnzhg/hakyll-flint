@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Control.Monad (forM_, void)
+import Control.Monad (forM_)
 import Data.Aeson qualified as Aeson
 import Data.List (isPrefixOf)
 import Data.Aeson.KeyMap qualified as KeyMap
@@ -84,12 +84,14 @@ targetTests =
     testGroup
         "parseLinkTarget"
         [ testCase "plain path" $
-            parseLinkTarget "recipes/a.md" @?= Just (LinkTarget (fromFilePath "recipes/a.md") Nothing)
+            parseLinkTarget "recipes/a.md" @?= Just (target "recipes/a.md" Nothing)
         , testCase "leading slash and anchor" $
             parseLinkTarget " /recipes/a.md#method "
-                @?= Just (LinkTarget (fromFilePath "recipes/a.md") (Just (Anchor "method")))
+                @?= Just (target "recipes/a.md" $ Just "method")
         , testCase "empty" $ parseLinkTarget "#only-anchor" @?= Nothing
         ]
+  where
+    target path anchor = LinkTarget (fromFilePath path) (Anchor <$> anchor)
 
 --------------------------------------------------------------------------------
 
@@ -119,7 +121,7 @@ siteTests =
             lacks p needles = do
                 body <- page p
                 forM_ needles $ \n ->
-                    assertBool (p <> " should not mention " <> show n) (not (n `T.isInfixOf` T.pack body))
+                    assertBool (p <> " should not mention " <> show n) . not $ n `T.isInfixOf` T.pack body
 
         copyTree "example/site" src
         build
@@ -192,4 +194,4 @@ copyTree from to = do
         isDir <- doesDirectoryExist (from </> e)
         if isDir
             then copyTree (from </> e) (to </> e)
-            else void (copyFile (from </> e) (to </> e))
+            else copyFile (from </> e) (to </> e)

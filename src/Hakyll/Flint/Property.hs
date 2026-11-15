@@ -58,7 +58,7 @@ module Hakyll.Flint.Property
     , propertyQueryField
     ) where
 
-import Control.Monad (forM, forM_, unless)
+import Control.Monad (forM, forM_, unless, (<=<))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
@@ -98,7 +98,7 @@ import Text.Blaze.Html5.Attributes qualified as A
 readPropertyValues
     :: Property -> Identifier -> Metadata -> Either PropertyError [PropertyValue]
 readPropertyValues prop ident meta =
-    case KeyMap.lookup (Key.fromText (unPropertyName (propertyName prop))) meta of
+    case KeyMap.lookup key meta of
         Nothing -> Right []
         Just raw -> do
             values <- filter (not . T.null . unPropertyValue) <$> fromJson raw
@@ -108,6 +108,7 @@ readPropertyValues prop ident meta =
                 (SingleValued, _ : _ : _) -> Left (TooManyValues prop ident values)
                 _ -> Right values
   where
+    key = Key.fromText . unPropertyName $ propertyName prop
     validSlug = not . T.null . unValueSlug . valueSlug
 
     fromJson :: Aeson.Value -> Either PropertyError [PropertyValue]
@@ -124,7 +125,7 @@ readPropertyValues prop ident meta =
         Aeson.String s -> Right (trimmed s)
         Aeson.Number n -> Right . PropertyValue $
             either (T.pack . show @Double) (T.pack . show @Integer) (floatingOrInteger n)
-        Aeson.Bool b -> Right (PropertyValue (if b then "true" else "false"))
+        Aeson.Bool b -> Right . PropertyValue $ if b then "true" else "false"
         Aeson.Null -> Left (unreadable "null inside a list")
         Aeson.Array _ -> Left (unreadable "nested list")
         Aeson.Object _ -> Left (unreadable "a mapping is not a value")
@@ -187,31 +188,38 @@ buildPropertyIndex prop pages valuePage = do
     let bySlug =
             Map.fromListWith
                 (flip merge)
-                [ (slug, ValueEntry v slug (valuePage slug) [ident])
+                [ (entrySlug entry, entry)
                 | (ident, vs) <- Map.toAscList byPage
-                , v <- vs
-                , let slug = valueSlug v
+                , entry <- map (entryFor ident) vs
                 ]
-        merge older newer =
-            older {entryMembers = entryMembers older <> entryMembers newer}
     pure
         PropertyIndex
             { indexProperty = prop
             , indexPattern = pages
             , indexDependency =
-                metadataDependency (PatternDependency pages (Set.fromList idents))
+                metadataDependency . PatternDependency pages $ Set.fromList idents
             , indexBySlug = Map.map dedupe bySlug
             , indexByPage = byPage
             }
   where
+    entryFor ident v = ValueEntry v slug (valuePage slug) [ident]
+      where
+        slug = valueSlug v
+
+    merge older newer =
+        older {entryMembers = entryMembers older <> entryMembers newer}
+
     -- A page listing both "Chicken" and "chicken" is still one member.
-    dedupe e = e {entryMembers = Set.toAscList (Set.fromList (entryMembers e))}
+    dedupe e = e {entryMembers = nubSorted $ entryMembers e}
+
+nubSorted :: (Ord a) => [a] -> [a]
+nubSorted = Set.toAscList . Set.fromList
 
 -- | Put value pages at a simple glob, filling the @*@ with the slug:
 --
 -- > valuePagesAt "ingredient/*.html"   -- ingredient/chicken-thigh.html
 valuePagesAt :: Pattern -> ValueSlug -> Identifier
-valuePagesAt pat = fromCapture pat . T.unpack . unValueSlug
+valuePagesAt pat = fromCapture pat . slugString
 
 -- | Every value, ordered by slug.
 indexEntries :: PropertyIndex -> [ValueEntry]
@@ -220,14 +228,21 @@ indexEntries = Map.elems . indexBySlug
 -- | Values are matched by slug, so @lookupValue idx "Chicken"@ finds
 -- @chicken@.
 lookupValue :: PropertyIndex -> PropertyValue -> Maybe ValueEntry
-lookupValue idx v = Map.lookup (valueSlug v) (indexBySlug idx)
+lookupValue idx v = Map.lookup (valueSlug v) $ indexBySlug idx
 
 pagesWithValue :: PropertyIndex -> PropertyValue -> [Identifier]
 pagesWithValue idx = maybe [] entryMembers . lookupValue idx
 
 -- | A page's values as written; empty for pages outside the index.
 valuesOfPage :: PropertyIndex -> Identifier -> [PropertyValue]
-valuesOfPage idx ident = Map.findWithDefault [] ident (indexByPage idx)
+valuesOfPage idx ident = Map.findWithDefault [] ident $ indexByPage idx
+
+-- | How many pages have this value.
+entryCount :: ValueEntry -> Int
+entryCount = length . entryMembers
+
+indexedName :: PropertyIndex -> PropertyName
+indexedName = propertyName . indexProperty
 
 --------------------------------------------------------------------------------
 -- Value pages
@@ -269,6 +284,10 @@ pageRefContext =
 pageRefs :: [Identifier] -> [Item ()]
 pageRefs = map (`Item` ())
 
+-- | The given pages, as the listing renders them.
+listPages :: PageListing -> [Identifier] -> Compiler [Item ()]
+listPages listing = listingOrder listing . pageRefs
+
 -- | Fields for one value: @$value$@, @$slug$@, @$url$@ (of the value's page),
 -- @$count$@ and the list @$pages$@.
 valueEntryContext :: Context ValueEntry
@@ -277,15 +296,16 @@ valueEntryContext = valueEntryContextWith defaultListing
 valueEntryContextWith :: PageListing -> Context ValueEntry
 valueEntryContextWith listing =
     mconcat
-        [ field "value" (pure . T.unpack . unPropertyValue . entryValue . itemBody)
-        , field "slug" (pure . T.unpack . unValueSlug . entrySlug . itemBody)
-        , field "count" (pure . show . length . entryMembers . itemBody)
-        , field "url" $ \item ->
-            maybe (noResult "value page has no route") (pure . toUrl)
-                =<< getRoute (entryPage (itemBody item))
-        , listFieldWith "pages" (listingContext listing) $ \item ->
-            listingOrder listing (pageRefs (entryMembers (itemBody item)))
+        [ entryField "value" (pure . valueString . entryValue)
+        , entryField "slug" (pure . slugString . entrySlug)
+        , entryField "count" (pure . show . entryCount)
+        , entryField "url" entryUrl
+        , listFieldWith "pages" (listingContext listing) $
+            listPages listing . entryMembers . itemBody
         ]
+  where
+    entryField name f = field name (f . itemBody)
+    entryUrl = maybe (noResult "value page has no route") (pure . toUrl) <=< getRoute . entryPage
 
 entryItem :: ValueEntry -> Item ValueEntry
 entryItem e = Item (entryPage e) e
@@ -304,14 +324,14 @@ propertyLinksField (ContextKey key) idx = field key $ \item -> do
         route <- maybe (pure Nothing) (getRoute . entryPage) (lookupValue idx v)
         pure (renderLink v route)
     if null links
-        then noResult ("page has no " <> show (propertyName (indexProperty idx)))
+        then noResult $ "page has no " <> show (indexedName idx)
         else pure . renderHtml . mconcat . intersperse ", " $ links
   where
     renderLink (PropertyValue v) = \case
         Nothing -> H.toHtml v
         Just path ->
             H5.a
-                H.! A.href (H.toValue (toUrl path))
+                H.! A.href (H.toValue $ toUrl path)
                 H.! A.rel "tag"
                 $ H.toHtml v
 
@@ -323,18 +343,17 @@ propertyValuesField (ContextKey key) idx =
         if k /= key
             then noResult ("not " <> key)
             else do
-                let entries =
-                        mapMaybe (lookupValue idx) (valuesOfPage idx (itemIdentifier item))
+                let entries = mapMaybe (lookupValue idx) . valuesOfPage idx $ itemIdentifier item
                 if null entries
                     then noResult "page has no values"
-                    else pure (ListField valueEntryContext (map entryItem entries))
+                    else pure . ListField valueEntryContext $ map entryItem entries
 
 -- | Every value of the property (e.g. for an index or a tag cloud).
 allValuesField :: ContextKey -> PropertyIndex -> Context a
 allValuesField (ContextKey key) idx =
     listField key valueEntryContext $ do
         dependOn idx
-        pure (map entryItem (indexEntries idx))
+        pure . map entryItem $ indexEntries idx
 
 -- | The pages having a fixed value, from any page.
 pagesWithValueField
@@ -342,7 +361,7 @@ pagesWithValueField
 pagesWithValueField (ContextKey key) listing idx value =
     listField key (listingContext listing) $ do
         dependOn idx
-        listingOrder listing (pageRefs (pagesWithValue idx value))
+        listPages listing $ pagesWithValue idx value
 
 -- | Everything a value's own page needs, for use inside 'valuePageRules':
 -- @$title$@ and @$value$@ (the value), @$slug$@, @$count$@, and the list
@@ -352,18 +371,17 @@ valuePageContext pagesKey listing entry =
     mconcat
         [ constField "title" value
         , constField "value" value
-        , constField "slug" (T.unpack (unValueSlug (entrySlug entry)))
-        , constField "count" (show (length (entryMembers entry)))
+        , constField "slug" . slugString $ entrySlug entry
+        , constField "count" . show $ entryCount entry
         , entryPagesField pagesKey listing entry
         ]
   where
-    value = T.unpack (unPropertyValue (entryValue entry))
+    value = valueString $ entryValue entry
 
 -- | The pages of a value page's own value; use inside 'valuePageRules'.
 entryPagesField :: ContextKey -> PageListing -> ValueEntry -> Context a
 entryPagesField (ContextKey key) listing entry =
-    listField key (listingContext listing) $
-        listingOrder listing (pageRefs (entryMembers entry))
+    listField key (listingContext listing) . listPages listing $ entryMembers entry
 
 -- | A template-callable query. With key @pagesWhere@:
 --
@@ -387,23 +405,24 @@ propertyQueryField (ContextKey key) listing indexes =
                 matches <- forM conditions $ \(name, value) -> do
                     idx <- maybe (unknown name) pure (findIndex name)
                     dependOn idx
-                    pure (Set.fromList (pagesWithValue idx value))
+                    pure . Set.fromList $ pagesWithValue idx value
                 let hits = case matches of
                         [] -> []
-                        m : ms -> Set.toAscList (foldr Set.intersection m ms)
-                ListField (listingContext listing) <$> listingOrder listing (pageRefs hits)
+                        m : ms -> Set.toAscList $ foldr Set.intersection m ms
+                ListField (listingContext listing) <$> listPages listing hits
   where
     byName :: Map PropertyName PropertyIndex
-    byName = Map.fromList [(propertyName (indexProperty i), i) | i <- indexes]
+    byName = Map.fromList [(indexedName i, i) | i <- indexes]
 
     findIndex name = Map.lookup name byName
 
     pairs :: [String] -> Compiler [(PropertyName, PropertyValue)]
     pairs = \case
         [] -> pure []
-        n : v : rest ->
-            ((PropertyName (T.pack n), PropertyValue (T.strip (T.pack v))) :) <$> pairs rest
-        [_] -> fail (key <> ": expected property/value pairs, got an odd number of arguments")
+        n : v : rest -> (condition n v :) <$> pairs rest
+        [_] -> fail $ key <> ": expected property/value pairs, got an odd number of arguments"
+
+    condition n v = (PropertyName $ T.pack n, PropertyValue . T.strip $ T.pack v)
 
     unknown (PropertyName n) =
         fail $
@@ -411,5 +430,5 @@ propertyQueryField (ContextKey key) listing indexes =
                 <> ": unknown property "
                 <> show n
                 <> "; known: "
-                <> show (map (unPropertyName . propertyName . indexProperty) indexes)
+                <> show (map (unPropertyName . indexedName) indexes)
 

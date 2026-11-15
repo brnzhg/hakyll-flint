@@ -16,6 +16,8 @@ module Hakyll.Flint.Property.Types
     , ValueSlug (..)
     , slugify
     , valueSlug
+    , valueString
+    , slugString
 
       -- * Template keys
     , ContextKey (..)
@@ -93,7 +95,14 @@ slugify =
         . T.map toLower
 
 valueSlug :: PropertyValue -> ValueSlug
-valueSlug (PropertyValue v) = ValueSlug (slugify v)
+valueSlug = ValueSlug . slugify . unPropertyValue
+
+-- | For Hakyll, which wants 'String's.
+valueString :: PropertyValue -> String
+valueString = T.unpack . unPropertyValue
+
+slugString :: ValueSlug -> String
+slugString = T.unpack . unValueSlug
 
 --------------------------------------------------------------------------------
 -- Template keys
@@ -124,7 +133,7 @@ renderPropertyError = \case
             <> "is single-valued but has "
             <> show (length vs)
             <> " values: "
-            <> T.unpack (T.intercalate ", " (map unPropertyValue vs))
+            <> commaSeparated vs
     UnreadableValue p ident why ->
         prefix p ident <> "could not be read: " <> T.unpack why
     EmptySlug p ident (PropertyValue v) ->
@@ -133,9 +142,11 @@ renderPropertyError = \case
             <> show v
             <> " which contains no letters or digits"
   where
+    commaSeparated = T.unpack . T.intercalate ", " . map unPropertyValue
+
     prefix p ident =
         "hakyll-flint: property '"
-            <> T.unpack (unPropertyName (propertyName p))
+            <> T.unpack (unPropertyName $ propertyName p)
             <> "' of "
             <> show ident
             <> " "

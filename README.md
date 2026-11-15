@@ -89,7 +89,8 @@ match "recipes/*.md" $ version "teaser" $ compile $
   pandocCompiler >>= saveSnapshot "teaser"
 
 -- inside a listing:
-loadAllSnapshots (fromList (map (setVersion (Just "teaser")) ids)) "teaser"
+let teasers = fromList $ map (setVersion $ Just "teaser") ids
+loadAllSnapshots teasers "teaser"
 ```
 
 The teaser version doesn't run property queries, so loading it never forms a
