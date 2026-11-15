@@ -50,6 +50,8 @@ executable flint-example
   hs-source-dirs:  example
   main-is:         Main.hs
   other-modules:   Site
+  -- `watch` (file watcher + preview server) needs the threaded runtime.
+  ghc-options:     -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     , hakyll
     , hakyll-flint
