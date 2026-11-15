@@ -11,31 +11,15 @@ Obsidian-flavoured extensions for [Hakyll](https://jaspervdj.be/hakyll/).
 - **Bases-style views** (planned): queries over properties. Basic AND queries
   already work through `propertyQueryField`.
 
-## Development
-
-The toolchain is whatever ghcup marks as *recommended*. The compiler is pinned
-in `cabal.project`.
-
-| tool  | version  |
-|-------|----------|
-| GHC   | 9.10.3   |
-| cabal | 3.16.1.0 |
-| HLS   | 2.14.0.0 |
+## Example
 
 ```sh
-ghcup install ghc 9.10.3 && ghcup install cabal recommended && ghcup install hls recommended
-cabal build all
-cabal test
 cd example/site && cabal run flint-example -- watch   # http://localhost:8000
 ```
 
-The code is formatted with fourmolu (`fourmolu.yaml`), which HLS uses
-automatically.
-
 ### Style
 
-Hakyll passes `String`s for nearly everything. This project uses small
-newtypes instead, so a signature tells you what each argument is:
+This project uses small newtypes instead, so a signature tells you what each argument is:
 `PropertyName`, `PropertyValue`, `ValueSlug` and `ContextKey` (the name a
 template refers to). All of them are `IsString`, so call sites still use
 plain literals.
@@ -145,15 +129,7 @@ the version `"flint-links"`, into just the list of paths it links to.
 output. Extracting links never loads anything, so there is no cycle, and
 Hakyll's normal dependency tracking rebuilds backlinks when a page changes.
 
-## AI assistance
+## AI Disclosure
 
-Most of this code was written by Claude (Anthropic's AI model), working in
-Claude Code under the author's direction. The author set the features,
-the design constraints and the code style. Claude wrote the
-implementation, the example site and the tests. Commits Claude worked on
-carry a `Co-Authored-By: Claude` trailer. `CLAUDE.md` holds the project
-notes given to the agent.
-
-The test suite builds the example site and checks the generated HTML,
-including incremental rebuilds. Even so, this is a young 0.1 library:
-read the code before depending on it.
+Most of this code was written by Claude Opus 5.5, 
+with rough specs and style guidelines from me. 
