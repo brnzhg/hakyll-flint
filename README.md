@@ -144,3 +144,16 @@ the version `"flint-links"`, into just the list of paths it links to.
 `backlinksField` loads those small items and never the other pages' real
 output. Extracting links never loads anything, so there is no cycle, and
 Hakyll's normal dependency tracking rebuilds backlinks when a page changes.
+
+## AI assistance
+
+Most of this code was written by Claude (Anthropic's AI model), working in
+Claude Code under the author's direction. The author set the features,
+the design constraints and the code style. Claude wrote the
+implementation, the example site and the tests. Commits Claude worked on
+carry a `Co-Authored-By: Claude` trailer. `CLAUDE.md` holds the project
+notes given to the agent.
+
+The test suite builds the example site and checks the generated HTML,
+including incremental rebuilds. Even so, this is a young 0.1 library:
+read the code before depending on it.
