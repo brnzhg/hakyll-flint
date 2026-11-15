@@ -4,3 +4,9 @@ packages: .
 with-compiler: ghc-9.10.3
 
 tests: True
+
+-- Packages with custom Setup scripts (pandoc's dependency chain) otherwise
+-- get a different Cabal library from `cabal build` (GHC's bundled 3.12) than
+-- from HLS's `cabal repl` (Hackage's 3.16). Different hashes mean the two
+-- build pandoc separately, so pin one.
+constraints: setup.Cabal ==3.16.1.0
