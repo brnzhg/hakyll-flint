@@ -1,0 +1,9 @@
+indentation: 4
+column-limit: 100
+function-arrows: leading
+comma-style: leading
+import-export-style: leading
+record-brace-space: false
+haddock-style: single-line
+let-style: auto
+in-style: right-align

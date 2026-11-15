@@ -1,0 +1,16 @@
+<article>
+<h1>$title$</h1>
+$if(cuisineLinks)$<p class="cuisine">Cuisine: $cuisineLinks$</p>$endif$
+$if(ingredientLinks)$<p class="ingredients">Ingredients: $ingredientLinks$</p>$endif$
+$body$
+$if(backlinks)$
+<aside class="backlinks">
+<h2>Linked from</h2>
+<ul>
+$for(backlinks)$
+<li><a href="$url$">$title$</a></li>
+$endfor$
+</ul>
+</aside>
+$endif$
+</article>

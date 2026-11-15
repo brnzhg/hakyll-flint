@@ -1,0 +1,48 @@
+# --- Cabal / GHC build artifacts ---
+dist/
+dist-newstyle/
+cabal-dev/
+.cabal-sandbox/
+cabal.sandbox.config
+cabal.project.local
+cabal.project.local~
+.ghc.environment.*
+*.o
+*.o-boot
+*.hi
+*.hi-boot
+*.hie
+*.dyn_o
+*.dyn_hi
+*.p_o
+*.p_hi
+*.chi
+*.chs.h
+*_stub.h
+.hpc/
+*.tix
+*.prof
+*.aux
+*.hp
+*.eventlog
+
+# --- Stack (in case it's ever used) ---
+.stack-work/
+
+# --- Tooling caches ---
+.hie/
+.hiefiles/
+.hls/
+.direnv/
+result
+result-*
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# --- Scratch output ---
+build_output.txt

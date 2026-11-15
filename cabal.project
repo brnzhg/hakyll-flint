@@ -1,0 +1,6 @@
+packages: .
+
+-- Pin the compiler so cabal and HLS agree (ghcup's "recommended" GHC).
+with-compiler: ghc-9.10.3
+
+tests: True
