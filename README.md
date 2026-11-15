@@ -17,13 +17,6 @@ Obsidian-flavoured extensions for [Hakyll](https://jaspervdj.be/hakyll/).
 cd example/site && cabal run flint-example -- watch   # http://localhost:8000
 ```
 
-### Style
-
-This project uses small newtypes instead, so a signature tells you what each argument is:
-`PropertyName`, `PropertyValue`, `ValueSlug` and `ContextKey` (the name a
-template refers to). All of them are `IsString`, so call sites still use
-plain literals.
-
 ## Custom properties
 
 ```haskell
