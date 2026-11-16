@@ -11,11 +11,13 @@ Obsidian-flavoured extensions for [Hakyll](https://jaspervdj.be/hakyll/).
 - **Bases-style views** (planned): queries over properties. Basic AND queries
   already work through `propertyQueryField`.
 
-## Example
+## Examples
 
 ```sh
 cd example/site && cabal run flint-example -- watch   # http://localhost:8000
 ```
+
+An example recipe site: https://github.com/brnzhg/zhang-recipes
 
 ## Custom properties
 
